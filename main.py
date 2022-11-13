@@ -12,12 +12,12 @@ import pickle
 
 from data import load_data
 
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
 
 print(device, " will be used.\n")
 
 num_of_epochs = 50
-batch_size = 10
+batch_size = 20
 lr = 0.0001
 
 uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}"
@@ -31,7 +31,7 @@ class AutoEncoder(torch.nn.Module):
         kernelSizes = [3] * nof_conv_layers
         stride = [1, 2, 1, 2, 2, 2]
         padding = [1] * nof_conv_layers
-        convOutDim = 16 * 16 * 1
+        convOutDim = 16 * 16 * 16
         latentDim = 256
 
         self.encoder = torch.nn.Sequential(
@@ -50,15 +50,15 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.Conv2d(16, 16, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Conv2d(16, 1, 3, stride=2, padding=1),
+            torch.nn.Conv2d(16, 16, 3, stride=2, padding=1),
             torch.nn.Flatten(),
             torch.nn.Linear(convOutDim, latentDim)
         )
 
         self.decoder = torch.nn.Sequential(
             torch.nn.Linear(latentDim, convOutDim),
-            torch.nn.Unflatten(1, (1, 16, 16)),
-            torch.nn.ConvTranspose2d(1, 4, 3, stride=1, padding=1),
+            torch.nn.Unflatten(1, (16, 16, 16)),
+            torch.nn.ConvTranspose2d(16, 4, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(4),
             torch.nn.ConvTranspose2d(4, 8, 4, stride=2, padding=1),
@@ -75,29 +75,7 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.BatchNorm2d(8),
             torch.nn.ConvTranspose2d(8, 3, 4, stride=2, padding=1)
         )
-
-        # Elayers = []
-        # for i in range(nof_conv_layers):
-        #     Elayers.append(torch.nn.Conv2d(c[i], c[i + 1], kernelSizes[i], stride=stride[i], padding=padding[i]))
-        #     Elayers.append(torch.nn.LeakyReLU())
-        #     Elayers.append(torch.nn.BatchNorm2d(c[i + 1]))
-        #
-        # Elayers.append(torch.nn.Flatten())
-        # # Elayers.append(torch.nn.Linear(convOutDim ,latentDim))
-        #
-        # self.encoder = torch.nn.Sequential(*Elayers)
-        #
-        # Dlayers = []
-        # # Dlayers.append(torch.nn.Linear(latentDim, convOutDim))
-        # Dlayers.append(torch.nn.Unflatten(1, (1, 16, 16)))
-        #
-        # for i in reversed(range(nof_conv_layers)):
-        #     Dlayers.append(torch.nn.ConvTranspose2d(c[i + 1], c[i], kernelSizes[i], stride=stride[i], padding=0))
-        #     Dlayers.append(torch.nn.LeakyReLU())
-        #     Dlayers.append(torch.nn.BatchNorm2d(c[i]))
-        #
-        # self.decoder = torch.nn.Sequential(*Dlayers)
-
+        
     def forward(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
