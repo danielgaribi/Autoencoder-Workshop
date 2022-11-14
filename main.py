@@ -8,6 +8,7 @@ from PIL import Image
 import os
 import matplotlib.pyplot as plt
 import pickle
+import argparse
 
 
 from data import load_data
@@ -15,6 +16,14 @@ from data import load_data
 device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
 print(device, " will be used.\n")
+
+def setArguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--num_of_epochs", default=100)
+    parser.add_argument("--batch_size", default=20)
+    parser.add_argument("--lr", default=0.0001)
+    args = parser.parse_args()
+    return args
 
 class AutoEncoder(torch.nn.Module):
     def __init__(self):
@@ -70,10 +79,10 @@ class AutoEncoder(torch.nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
-def main():
-    num_of_epochs = 30
-    batch_size = 20
-    lr = 0.0001
+def main(args):
+    num_of_epochs = args.num_of_epochs
+    batch_size = args.batch_size
+    lr = args.lr
     lr_cut_loss = [0.1, 0.075, 0.05]
     lr_cut_factor = 10
 
@@ -174,4 +183,5 @@ def custom_to_pil(x):
         x = x.convert("RGB")
     return x
 
-main()
+args = setArguments()
+main(args)
