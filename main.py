@@ -12,7 +12,7 @@ import pickle
 
 from data import load_data
 
-device = torch.device("cuda:2" if (torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
 
 print(device, " will be used.\n")
 
@@ -26,45 +26,40 @@ class AutoEncoder(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        nof_conv_layers = 6
-        c = [3, 4, 8, 8, 16, 16, 1]
-        kernelSizes = [3] * nof_conv_layers
-        stride = [1, 2, 1, 2, 2, 2]
-        padding = [1] * nof_conv_layers
-        convOutDim = 16 * 16 * 16
+        convOutDim = 64 * 16 * 16
         latentDim = 256
 
         self.encoder = torch.nn.Sequential(
-            torch.nn.Conv2d(3, 4, 3, stride=1, padding=1),
-            torch.nn.LeakyReLU(),
-            torch.nn.BatchNorm2d(4),
-            torch.nn.Conv2d(4, 8, 3, stride=2, padding=1),
-            torch.nn.LeakyReLU(),
-            torch.nn.BatchNorm2d(8),
-            torch.nn.Conv2d(8, 8, 3, stride=1, padding=1),
+            torch.nn.Conv2d(3, 8, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(8),
             torch.nn.Conv2d(8, 16, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            torch.nn.Conv2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Conv2d(16, 16, 3, stride=2, padding=1),
+            torch.nn.Conv2d(16, 32, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.Conv2d(32, 32, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.Conv2d(32, 64, 3, stride=2, padding=1),
             torch.nn.Flatten(),
             torch.nn.Linear(convOutDim, latentDim)
         )
 
         self.decoder = torch.nn.Sequential(
             torch.nn.Linear(latentDim, convOutDim),
-            torch.nn.Unflatten(1, (16, 16, 16)),
-            torch.nn.ConvTranspose2d(16, 4, 3, stride=1, padding=1),
+            torch.nn.Unflatten(1, (64, 16, 16)),
+            torch.nn.ConvTranspose2d(64, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
-            torch.nn.BatchNorm2d(4),
-            torch.nn.ConvTranspose2d(4, 8, 4, stride=2, padding=1),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
-            torch.nn.BatchNorm2d(8),
-            torch.nn.ConvTranspose2d(8, 16, 3, stride=1, padding=1),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.ConvTranspose2d(32, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
             torch.nn.ConvTranspose2d(16, 16, 4, stride=2, padding=1),
