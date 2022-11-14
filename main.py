@@ -12,7 +12,7 @@ import pickle
 
 from data import load_data
 
-device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:2" if (torch.cuda.is_available()) else "cpu")
 
 print(device, " will be used.\n")
 
@@ -75,7 +75,7 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.BatchNorm2d(8),
             torch.nn.ConvTranspose2d(8, 3, 4, stride=2, padding=1)
         )
-        
+
     def forward(self, x):
         encoded = self.encoder(x)
         decoded = self.decoder(encoded)
@@ -87,7 +87,8 @@ def main():
     data_loader, val_loader = load_data(dataset_path, batch_size)
 
     ae = AutoEncoder().to(device)
-    criterion = torch.nn.L1Loss()
+    criterion1 = torch.nn.L1Loss()
+    criterion2 = torch.nn.MSELoss()
     optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr)
     optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr)
 
@@ -104,7 +105,7 @@ def main():
             optimizerEncoder.zero_grad()
             optimizerDecoder.zero_grad()
             result = ae(images_batch)
-            batch_loss = criterion(images_batch, result)
+            batch_loss = 0.5 * (criterion1(images_batch, result) + criterion2(images_batch, result))
             batch_loss.backward()
             optimizerDecoder.step()
             optimizerEncoder.step()
@@ -117,7 +118,7 @@ def main():
             for images_batch in tqdm(val_loader):
                 images_batch = images_batch.to(device)
                 result = ae(images_batch)
-                batch_loss = criterion(images_batch, result)
+                batch_loss = 0.5 * (criterion1(images_batch, result) + criterion2(images_batch, result))
                 validation_loss.append(torch.mean(batch_loss).cpu().item())
                 if is_first:
                     is_first = False
