@@ -12,15 +12,9 @@ import pickle
 
 from data import load_data
 
-device = torch.device("cuda:1" if (torch.cuda.is_available()) else "cpu")
+device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
 
 print(device, " will be used.\n")
-
-num_of_epochs = 50
-batch_size = 20
-lr = 0.0001
-
-uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}"
 
 class AutoEncoder(torch.nn.Module):
     def __init__(self):
@@ -76,8 +70,15 @@ class AutoEncoder(torch.nn.Module):
         decoded = self.decoder(encoded)
         return decoded
 
-
 def main():
+    num_of_epochs = 30
+    batch_size = 20
+    lr = 0.0001
+    lr_cut_loss = [0.1, 0.075, 0.05]
+    lr_cut_factor = 10
+
+    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}"
+
     dataset_path = './dataset/'
     data_loader, val_loader = load_data(dataset_path, batch_size)
 
@@ -117,8 +118,8 @@ def main():
                 validation_loss.append(torch.mean(batch_loss).cpu().item())
                 if is_first:
                     is_first = False
-                    save_image(images_batch[0], f"epoch_{epoch}_origin")
-                    save_image(result[0], f"epoch_{epoch}_rec")
+                    save_image(images_batch[0], f"epoch_{epoch}_origin", uniq_name)
+                    save_image(result[0], f"epoch_{epoch}_rec", uniq_name)
 
         print(f"epoch {epoch}: trainning_loss={np.mean(trainning_loss)}, validation_loss={np.mean(validation_loss)}")
 
@@ -129,9 +130,16 @@ def main():
             minValidationLoss = np.mean(validation_loss)
             torch.save(ae.state_dict(), os.path.join("out", uniq_name, f"{uniq_name}.pt"))
 
-    save_results(trainning_losses, validation_losses)
+        if len(lr_cut_loss) != 0 and lr_cut_loss[0] > np.mean(validation_loss):
+            print(f"cut lr by {lr_cut_factor}")
+            lr = lr / lr_cut_factor
+            lr_cut_loss.pop(0)
+            optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr)
+            optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr)
 
-def save_results(trainning_losses, validation_losses):
+    save_results(trainning_losses, validation_losses, uniq_name)
+
+def save_results(trainning_losses, validation_losses, uniq_name):
     plt.plot(trainning_losses, label="training loss")
     plt.plot(validation_losses, label="validation loss")
     plt.legend()
@@ -146,7 +154,7 @@ def save_results(trainning_losses, validation_losses):
         pickle.dump(dict, f)
 
 
-def save_image(x, name):
+def save_image(x, name, uniq_name):
     img = custom_to_pil(x)
     folder_path = os.path.join("out", uniq_name)
     if not os.path.exists(folder_path):
