@@ -13,15 +13,14 @@ import argparse
 
 from data import load_data
 
-device = torch.device("cuda:0" if (torch.cuda.is_available()) else "cpu")
-
-print(device, " will be used.\n")
 
 def setArguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_of_epochs", default=100)
-    parser.add_argument("--batch_size", default=20)
-    parser.add_argument("--lr", default=0.0001)
+    parser.add_argument("--num_of_epochs", default=100, type=int)
+    parser.add_argument("--batch_size", default=20, type=int)
+    parser.add_argument("--lr", default=0.0001, type=float)
+    parser.add_argument("--gpu_id", default=0, type=int)
+    parser.add_argument("--l1_lambda", default=0.5, type=float)
     args = parser.parse_args()
     return args
 
@@ -29,7 +28,7 @@ class AutoEncoder(torch.nn.Module):
     def __init__(self):
         super().__init__()
 
-        convOutDim = 64 * 16 * 16
+        convOutDim = 128 * 16 * 16
         latentDim = 256
 
         self.encoder = torch.nn.Sequential(
@@ -45,33 +44,45 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.Conv2d(16, 32, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
-            torch.nn.Conv2d(32, 32, 3, stride=2, padding=1),
+            torch.nn.Conv2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
             torch.nn.Conv2d(32, 64, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(64, 64, 3, stride=1, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(64, 128, 3, stride=2, padding=1),
             torch.nn.Flatten(),
             torch.nn.Linear(convOutDim, latentDim)
         )
 
         self.decoder = torch.nn.Sequential(
             torch.nn.Linear(latentDim, convOutDim),
-            torch.nn.Unflatten(1, (64, 16, 16)),
-            torch.nn.ConvTranspose2d(64, 32, 3, stride=1, padding=1),
+            torch.nn.Unflatten(1, (128, 16, 16)),
+            torch.nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
-            torch.nn.ConvTranspose2d(32, 32, 4, stride=2, padding=1),
+            torch.nn.ConvTranspose2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
-            torch.nn.ConvTranspose2d(32, 16, 3, stride=1, padding=1),
+            torch.nn.ConvTranspose2d(32, 16, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
-            torch.nn.ConvTranspose2d(16, 16, 4, stride=2, padding=1),
+            torch.nn.ConvTranspose2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
             torch.nn.ConvTranspose2d(16, 8, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(8),
-            torch.nn.ConvTranspose2d(8, 3, 4, stride=2, padding=1)
+            torch.nn.ConvTranspose2d(8, 3, 3, stride=1, padding=1)
         )
 
     def forward(self, x):
@@ -81,12 +92,17 @@ class AutoEncoder(torch.nn.Module):
 
 def main(args):
     num_of_epochs = args.num_of_epochs
+    l1_lambda = args.l1_lambda
+    mse_lambda = 1.0 - l1_lambda
     batch_size = args.batch_size
     lr = args.lr
-    lr_cut_loss = [0.1, 0.075, 0.05]
-    lr_cut_factor = 10
+    lr_cut_loss = [0.1, 0.08, 0.06]
+    lr_cut_factor = 4
 
-    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}"
+    device = torch.device(f"cuda:{args.gpu_id}" if (torch.cuda.is_available()) else "cpu")
+    print(device, " will be used.\n")
+
+    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}_l1-lab-{l1_lambda}"
 
     dataset_path = './dataset/'
     data_loader, val_loader = load_data(dataset_path, batch_size)
@@ -110,7 +126,7 @@ def main(args):
             optimizerEncoder.zero_grad()
             optimizerDecoder.zero_grad()
             result = ae(images_batch)
-            batch_loss = 0.5 * (criterion1(images_batch, result) + criterion2(images_batch, result))
+            batch_loss = l1_lambda * criterion1(images_batch, result) + mse_lambda * criterion2(images_batch, result)
             batch_loss.backward()
             optimizerDecoder.step()
             optimizerEncoder.step()
@@ -123,7 +139,7 @@ def main(args):
             for images_batch in tqdm(val_loader):
                 images_batch = images_batch.to(device)
                 result = ae(images_batch)
-                batch_loss = 0.5 * (criterion1(images_batch, result) + criterion2(images_batch, result))
+                batch_loss = l1_lambda * criterion1(images_batch, result) + mse_lambda * criterion2(images_batch, result)
                 validation_loss.append(torch.mean(batch_loss).cpu().item())
                 if is_first:
                     is_first = False
