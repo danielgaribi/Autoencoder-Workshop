@@ -20,12 +20,14 @@ def setArguments():
     parser.add_argument("--batch_size", default=20, type=int)
     parser.add_argument("--lr", default=0.0001, type=float)
     parser.add_argument("--gpu_id", default=0, type=int)
-    parser.add_argument("--l1_lambda", default=0.5, type=float)
+    parser.add_argument("--l1_lambda", default=1.0, type=float)
+    parser.add_argument("--weight_decay", default=0.0, type=float)
+    parser.add_argument("--dropout", default=0.0, type=float)
     args = parser.parse_args()
     return args
 
 class AutoEncoder(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, dropout=0):
         super().__init__()
 
         convOutDim = 128 * 16 * 16
@@ -35,24 +37,31 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.Conv2d(3, 8, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(8),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(8, 16, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(16, 32, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(32, 64, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(64),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(64, 64, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(64),
+            torch.nn.Dropout2d(dropout),
             torch.nn.Conv2d(64, 128, 3, stride=2, padding=1),
             torch.nn.Flatten(),
             torch.nn.Linear(convOutDim, latentDim)
@@ -64,24 +73,31 @@ class AutoEncoder(torch.nn.Module):
             torch.nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(64),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(64),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(32),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(32, 16, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(16),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(16, 8, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
             torch.nn.BatchNorm2d(8),
+            torch.nn.Dropout2d(dropout),
             torch.nn.ConvTranspose2d(8, 3, 3, stride=1, padding=1)
         )
 
@@ -94,6 +110,8 @@ def main(args):
     num_of_epochs = args.num_of_epochs
     l1_lambda = args.l1_lambda
     mse_lambda = 1.0 - l1_lambda
+    weight_decay = args.weight_decay
+    dropout = args.dropout
     batch_size = args.batch_size
     lr = args.lr
     lr_cut_loss = [0.1, 0.08, 0.06]
@@ -102,16 +120,16 @@ def main(args):
     device = torch.device(f"cuda:{args.gpu_id}" if (torch.cuda.is_available()) else "cpu")
     print(device, " will be used.\n")
 
-    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}_l1-lab-{l1_lambda}"
+    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}_l1-lab-{l1_lambda}_weight-decay-{weight_decay}_dropout-{dropout}"
 
     dataset_path = './dataset/'
     data_loader, val_loader = load_data(dataset_path, batch_size)
 
-    ae = AutoEncoder().to(device)
+    ae = AutoEncoder(dropout=dropout).to(device)
     criterion1 = torch.nn.L1Loss()
     criterion2 = torch.nn.MSELoss()
-    optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr)
-    optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr)
+    optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr, weight_decay=weight_decay)
 
     trainning_losses = []
     validation_losses = []
@@ -121,6 +139,7 @@ def main(args):
         print(f"epoch {epoch}")
         print(f"training...")
         trainning_loss = []
+        ae.train()
         for images_batch in tqdm(data_loader):
             images_batch = images_batch.to(device)
             optimizerEncoder.zero_grad()
@@ -135,6 +154,7 @@ def main(args):
         validation_loss = []
         print(f"Validation...")
         is_first = True
+        ae.eval()
         with torch.no_grad():
             for images_batch in tqdm(val_loader):
                 images_batch = images_batch.to(device)
@@ -159,8 +179,8 @@ def main(args):
             print(f"cut lr by {lr_cut_factor}")
             lr = lr / lr_cut_factor
             lr_cut_loss.pop(0)
-            optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr)
-            optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr)
+            optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr, weight_decay=weight_decay)
+            optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr, weight_decay=weight_decay)
 
     save_results(trainning_losses, validation_losses, uniq_name)
 
