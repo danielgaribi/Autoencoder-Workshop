@@ -22,47 +22,41 @@ def setArguments():
     parser.add_argument("--gpu_id", default=0, type=int)
     parser.add_argument("--l1_lambda", default=1.0, type=float)
     parser.add_argument("--weight_decay", default=0.0, type=float)
-    parser.add_argument("--dropout", default=0.0, type=float)
     args = parser.parse_args()
     return args
 
 class AutoEncoder(torch.nn.Module):
-    def __init__(self, dropout=0):
+    def __init__(self):
         super().__init__()
 
         convOutDim = 128 * 16 * 16
         latentDim = 256
 
         self.encoder = torch.nn.Sequential(
-            torch.nn.Conv2d(3, 8, 3, stride=1, padding=1),
-            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=3, out_channels=8, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(8),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(8, 16, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=8, out_channels=16, kernel_size=3, stride=2, padding=1),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=16, out_channels=16, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(16, 32, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, stride=2, padding=1),
             torch.nn.BatchNorm2d(32),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(32),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(32, 64, 3, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, stride=2, padding=1),
             torch.nn.BatchNorm2d(64),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(64, 64, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(64),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.Conv2d(64, 128, 3, stride=2, padding=1),
+            torch.nn.LeakyReLU(),
+            torch.nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=2, padding=1),
+            torch.nn.BatchNorm2d(128),
+            torch.nn.LeakyReLU(),
             torch.nn.Flatten(),
             torch.nn.Linear(convOutDim, latentDim)
         )
@@ -70,35 +64,28 @@ class AutoEncoder(torch.nn.Module):
         self.decoder = torch.nn.Sequential(
             torch.nn.Linear(latentDim, convOutDim),
             torch.nn.Unflatten(1, (128, 16, 16)),
-            torch.nn.ConvTranspose2d(128, 64, 4, stride=2, padding=1),
-            torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=4, stride=2, padding=1),
             torch.nn.BatchNorm2d(64),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(64, 64, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(64),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(64, 32, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=4, stride=2, padding=1),
             torch.nn.BatchNorm2d(32),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(32, 32, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=32, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(32),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(32, 16, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=4, stride=2, padding=1),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(16, 16, 3, stride=1, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=3, stride=1, padding=1),
             torch.nn.BatchNorm2d(16),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(16, 8, 4, stride=2, padding=1),
             torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=16, out_channels=8, kernel_size=4, stride=2, padding=1),
             torch.nn.BatchNorm2d(8),
-            torch.nn.Dropout2d(dropout),
-            torch.nn.ConvTranspose2d(8, 3, 3, stride=1, padding=1)
+            torch.nn.LeakyReLU(),
+            torch.nn.ConvTranspose2d(in_channels=8, out_channels=3, kernel_size=3, stride=1, padding=1)
         )
 
     def forward(self, x):
@@ -111,21 +98,20 @@ def main(args):
     l1_lambda = args.l1_lambda
     mse_lambda = 1.0 - l1_lambda
     weight_decay = args.weight_decay
-    dropout = args.dropout
     batch_size = args.batch_size
     lr = args.lr
-    lr_cut_loss = [0.1, 0.08, 0.06]
-    lr_cut_factor = 4
+    lr_cut_loss = [0.11, 0.10, 0.9]
+    lr_cut_factor = 5
 
     device = torch.device(f"cuda:{args.gpu_id}" if (torch.cuda.is_available()) else "cpu")
     print(device, " will be used.\n")
 
-    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}_l1-lab-{l1_lambda}_weight-decay-{weight_decay}_dropout-{dropout}"
+    uniq_name = f"{datetime.now().strftime('%m-%d-%Y-%H-%M-%S')}_epoch-{num_of_epochs}_batch_size-{batch_size}_lr-{lr}_l1-lab-{l1_lambda}_weight-decay-{weight_decay}"
 
     dataset_path = './dataset/'
     data_loader, val_loader = load_data(dataset_path, batch_size)
 
-    ae = AutoEncoder(dropout=dropout).to(device)
+    ae = AutoEncoder().to(device)
     criterion1 = torch.nn.L1Loss()
     criterion2 = torch.nn.MSELoss()
     optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr, weight_decay=weight_decay)
@@ -182,13 +168,20 @@ def main(args):
             optimizerEncoder = torch.optim.Adam(ae.encoder.parameters(), lr=lr, weight_decay=weight_decay)
             optimizerDecoder = torch.optim.Adam(ae.decoder.parameters(), lr=lr, weight_decay=weight_decay)
 
+        if epoch % 10 == 0:
+            save_plot(trainning_losses, validation_losses, uniq_name, epoch)
+
     save_results(trainning_losses, validation_losses, uniq_name)
 
-def save_results(trainning_losses, validation_losses, uniq_name):
+def save_plot(trainning_losses, validation_losses, uniq_name, epoch):
     plt.plot(trainning_losses, label="training loss")
     plt.plot(validation_losses, label="validation loss")
     plt.legend()
-    plt.savefig(os.path.join("out", uniq_name, f"{uniq_name}_plot.png"))
+    plt.savefig(os.path.join("out", uniq_name, f"{uniq_name}_plot_epoch-{epoch}.png"))
+    plt.clf()
+
+def save_results(trainning_losses, validation_losses, uniq_name):
+    save_plot(trainning_losses, validation_losses, uniq_name, "final")
 
     dict = {
         "trainning_losses": trainning_losses,
